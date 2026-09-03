@@ -22,12 +22,101 @@ routes.post('/login', (req: Request, res: Response) => {
 routes.get('/jogos', async (req: Request, res: Response) => {
   try {
     const db = await openDb();
-    const jogos = await db.all('SELECT * FROM jogos');
-    res.status(200).json(jogos);
+
+    const { tipo, favorito, notaMinima, busca } = req.query;
+
+    let sql = 'SELECT * FROM jogos WHERE 1 = 1';
+    const params: any[] = [];
+
+    if (tipo) {
+      sql += ' AND tipo = ?';
+      params.push(tipo);
+    }
+
+    if (favorito !== undefined) {
+      sql += ' AND favorito = ?';
+      params.push(favorito === 'true' ? 1 : 0);
+    }
+
+    if (notaMinima !== undefined) {
+      sql += ' AND nota >= ?';
+      params.push(Number(notaMinima));
+    }
+
+    if (busca) {
+      sql += ' AND nome LIKE ?';
+      params.push(`%${busca}%`);
+    }
+
+    sql += ' ORDER BY nota DESC';
+
+    const jogos = await db.all(sql, params);
+
+    res.status(200).json({
+      total: jogos.length,
+      filtros: {
+        tipo: tipo || null,
+        favorito: favorito || null,
+        notaMinima: notaMinima || null,
+        busca: busca || null
+      },
+      jogos
+    });
   } catch (error) {
-    res.status(500).json({ error: "Erro interno do servidor" });
+    console.error('Erro ao buscar jogos:', error);
+
+    res.status(500).json({
+      error: 'Erro interno do servidor'
+    });
   }
 });
+
+routes.get('/jogos/estatisticas/resumo', async (_req: Request, res: Response) => {
+  try {
+    const db = await openDb();
+
+    const total = await db.get(
+      'SELECT COUNT(*) as total FROM jogos'
+    );
+
+    const media = await db.get(
+      'SELECT ROUND(AVG(nota), 2) as media FROM jogos'
+    );
+
+    const melhor = await db.get(
+      `SELECT * FROM jogos
+       ORDER BY nota DESC
+       LIMIT 1`
+    );
+
+    const pior = await db.get(
+      `SELECT * FROM jogos
+       ORDER BY nota ASC
+       LIMIT 1`
+    );
+
+    const favoritos = await db.get(
+      `SELECT COUNT(*) as total
+       FROM jogos
+       WHERE favorito = 1`
+    );
+
+    res.status(200).json({
+      totalJogos: total.total,
+      notaMedia: media.media || 0,
+      totalFavoritos: favoritos.total,
+      melhorJogo: melhor || null,
+      piorJogo: pior || null
+    });
+  } catch (error) {
+    console.error('Erro ao gerar estatísticas:', error);
+
+    res.status(500).json({
+      error: 'Erro interno do servidor'
+    });
+  }
+});
+
 
 routes.get('/jogos/:id', async (req: Request, res: Response) => {
   try {

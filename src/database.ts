@@ -10,14 +10,17 @@ export async function openDb(){
 
 export async function initDb() {
   const db = await openDb();
+
   await db.exec(`
     CREATE TABLE IF NOT EXISTS jogos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT NOT NULL,
       tipo TEXT NOT NULL,
       nota INTEGER NOT NULL,
-      review TEXT NOT NULL
+      review TEXT NOT NULL,
+      favorito INTEGER DEFAULT 0
     )
   `);
+
 }
 
